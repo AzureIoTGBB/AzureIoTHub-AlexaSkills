@@ -1,0 +1,69 @@
+using System;
+using Microsoft.Azure.Devices;  // need version 1.4 else the Async will not reply
+using System.Net;
+using System.Threading;
+using System.Net.Http;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+const string IoTConnectionString = "<IoT Hub connection String>";
+const string device = "<IoT Device Name>";
+static string responseText = "";
+static string intentAction = "";
+static ServiceClient serviceClient; 
+public static async Task<HttpResponseMessage> Run(HttpRequestMessage req, TraceWriter log)
+{
+    dynamic data = await req.Content.ReadAsAsync<object>();
+    log.Info($"Content={data}");
+
+    // Set name to query string or body data
+    string intentName = data.request.intent.name;
+    intentAction = data.request.intent.slots.action.value;
+    log.Info($"intentName={intentName}");
+    switch (intentName)
+    {
+        case "turnlightonoff":
+            if (intentAction == "on")
+            { 
+                responseText = "Sure thing Keith.  Let me trun on the light for you.";
+            }
+            else if (intentAction == "off")
+            { 
+                responseText = "Sure thing Keith.  Let me turn off the light for you."; 
+            }
+            else 
+            {
+                responseText = "I am not sure of what just happened.";
+            }
+        break;
+        default: 
+            responseText = "Keith I am unsure of your intent.";
+            break;
+    }
+        light(log);
+        
+        return req.CreateResponse(HttpStatusCode.OK, new {
+            version = "1.1",
+            sessionAttributes = new { },
+            response = new
+                {
+                    outputSpeech = new
+                    {
+                        type = "PlainText",
+                        text = responseText
+                    },
+                    shouldEndSession = true
+                }
+            }); 
+    
+    
+
+}
+public static async void light(TraceWriter log)
+{
+        serviceClient = ServiceClient.CreateFromConnectionString(IoTConnectionString);
+        var commandMessage = new Message(System.Text.Encoding.ASCII.GetBytes(intentAction.ToUpper()));
+        // send the command to the device
+        await serviceClient.SendAsync(device, commandMessage);  
+
+}
